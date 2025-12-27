@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChatInputCommandInteraction } from 'discord.js';
 import { getState, setKing, resetStreak } from '../gameState';
 import config from '../config.json';
+import { getCurrentKing } from '../utils/roleUtils';
 
 export const data = new SlashCommandBuilder()
     .setName('setking')
@@ -13,14 +14,15 @@ export const data = new SlashCommandBuilder()
 
 export const execute = async (interaction: ChatInputCommandInteraction) => {
     const targetUser = interaction.options.getUser('user', true);
-    const state = getState()
-    const oldKingId = state.king;
+    const guild = interaction.guild;
+    if (!guild) return;
+
+    // Get current king from roles
+    const currentKingMember = await getCurrentKing(guild);
+    const oldKingId = currentKingMember?.id;
 
     resetStreak();
     setKing(targetUser.id);
-
-    const guild = interaction.guild;
-    if (!guild) return;
 
     const role = guild.roles.cache.find(r => r.name === config.roleName);
 

@@ -1,50 +1,56 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, } from 'discord.js';
-import { getState, } from '../../gameState';
+import { SlashCommandBuilder, ChatInputCommandInteraction, TextChannel } from 'discord.js';
+import { getState } from '../../gameState';
 import { validateChallenge, getMatchResults, processMatchEnd, handleRoleAndNicknameUpdates, announceResult } from './helpers';
-
+import config from '../../config.json';
 
 export const data = new SlashCommandBuilder()
     .setName('report')
-    .setDescription('Report the results of the challenge')
+    .setDescription('Report the results of the challenge (Admin/Authorized only)')
     .addIntegerOption(option =>
-        option.setName('my_score')
-            .setDescription('Your score')
+        option.setName('challenger_score')
+            .setDescription('Score for the challenger')
             .setRequired(true))
     .addIntegerOption(option =>
-        option.setName('opponent_score')
-            .setDescription('Opponent\'s score')
+        option.setName('defender_score')
+            .setDescription('Score for the defender')
             .setRequired(true));
 
-
-
 export const execute = async (interaction: ChatInputCommandInteraction) => {
-    const state = getState();
-    const user = interaction.user;
+    // 1. Channel Restriction
+    const channel = interaction.channel as TextChannel;
+    if (channel?.name !== config.reportChannelName) {
+        return interaction.reply({
+            content: `This command can only be used in the #${config.reportChannelName} channel.`,
+            ephemeral: true
+        });
+    }
 
-    // 1. Validation
-    const validationError = validateChallenge(state, user.id);
+    const state = getState();
+
+    // 2. Validation
+    const validationError = validateChallenge(state);
     if (validationError) {
         return interaction.reply({ content: validationError, ephemeral: true });
     }
 
-    const myScore = interaction.options.getInteger('my_score', true);
-    const opponentScore = interaction.options.getInteger('opponent_score', true);
+    const challengerScore = interaction.options.getInteger('challenger_score', true);
+    const defenderScore = interaction.options.getInteger('defender_score', true);
 
-    // 2. Determine Results
-    const results = getMatchResults(state.activeChallenge!, user.id, myScore, opponentScore);
+    // 3. Determine Results
+    const results = getMatchResults(state.activeChallenge!, challengerScore, defenderScore);
     if (results.error) {
         return interaction.reply({ content: results.error, ephemeral: true });
     }
 
     const { winnerId, isNewKing, oldKingId } = processMatchEnd(state, results.winnerId!);
 
-    // 3. Role & Nickname Management
+    // 4. Role & Nickname Management
     const guild = interaction.guild;
     if (guild) {
         await handleRoleAndNicknameUpdates(guild, oldKingId, winnerId!, isNewKing);
     }
 
-    // 4. Announcement
+    // 5. Announcement
     announceResult(interaction, winnerId!, oldKingId, isNewKing);
 
     await interaction.reply({ content: 'Match reported successfully!', ephemeral: true });

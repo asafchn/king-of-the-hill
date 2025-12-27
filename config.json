@@ -1,4 +1,5 @@
 {
     "roleName": "King of the Hill",
-    "channelName": "koth-announcements"
+    "channelName": "koth-announcements",
+    "reportChannelName": "koth-reports"
 }

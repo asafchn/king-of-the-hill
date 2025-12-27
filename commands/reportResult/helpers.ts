@@ -5,23 +5,16 @@ import config from '../../config.json';
 /**
  * Validates if a report can be made
  */
-export function validateChallenge(state: GameState, userId: string): string | null {
+export function validateChallenge(state: GameState): string | null {
     if (!state.activeChallenge) return 'There is no active challenge to report on.';
     if (!state.activeChallenge.accepted) return 'The challenge has not been accepted yet.';
-    if (state.activeChallenge.challenger !== userId && state.activeChallenge.defender !== userId) {
-        return 'You are not a participant in the current challenge.';
-    }
     return null;
 }
 
 /**
  * Calculates scores and determines the winner
  */
-export function getMatchResults(challenge: any, reporterId: string, myScore: number, opponentScore: number) {
-    const isChallenger = reporterId === challenge.challenger;
-    const challengerScore = isChallenger ? myScore : opponentScore;
-    const defenderScore = isChallenger ? opponentScore : myScore;
-
+export function getMatchResults(challenge: any, challengerScore: number, defenderScore: number) {
     const maxScore = challenge.type === 'bo3' ? 2 : 3;
 
     if (challengerScore > maxScore || defenderScore > maxScore) {

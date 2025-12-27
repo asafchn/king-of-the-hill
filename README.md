@@ -14,7 +14,12 @@ A TypeScript-based Discord bot to manage "King of the Hill" challenges within a 
 npm install
 ```
 
-### 3. Configuration
+### 3. Database Setup
+The bot uses **SQLite** for persistence. You don't need to install a separate database server.
+- The database is automatically created as a file named `koth.db` in the root directory the first time the bot runs.
+- If you want to reset the bot's state, simply delete the `koth.db` file.
+
+### 4. Configuration
 Create a `.env` file in the root directory:
 ```env
 DISCORD_TOKEN=your_bot_token_here
@@ -26,7 +31,8 @@ Update `config.json` with your desired role and channel names:
 ```json
 {
     "roleName": "King of the Hill",
-    "channelName": "koth-announcements"
+    "channelName": "koth-announcements",
+    "reportChannelName": "koth-reports"
 }
 ```
 
@@ -38,7 +44,7 @@ npm run deploy
 
 Then, start the bot:
 ```bash
-npm start
+npm run dev
 ```
 
 ---
@@ -48,38 +54,32 @@ npm start
 1.  **Initial Setup**: Use `/setking @user` to manually crown the first King.
 2.  **Challenge**: As another user, run `/challenge` (target the King). Choose `BO3` or `BO5`.
 3.  **Accept**: The King must run `/accept` to start the match.
-4.  **Report**: After the match, run `/report`. 
-    -   Example: In a BO3, reporting `2` for yourself and `1` for the opponent will crown you as the new King.
+4.  **Report**: An authorized user (e.g., Moderator) runs `/report` in the restricted reporting channel.
+    -   Example: In a BO3, reporting `2` for the challenger and `1` for the defender will crown the challenger as the new King.
 5.  **Verify**:
     -   Check if the "King of the Hill" role moved to the winner.
     -   Check if the winner's nickname updated to include `[1]` (win streak).
-    -   Check the `#koth-announcements` channel for the update.
+    -   Check the announcements channel for the update.
+    -   Restart the bot and verify streaks are preserved (SQLite persistence).
 
 ---
 
 ## 🛠️ Project Architecture
 
--   **`index.ts`**: Main entry point. Uses static imports for commands and events.
--   **`gameState.ts`**: In-memory state management for the King, streaks, and active challenges.
--   **`commands/`**: Contains slash command logic.
--   **`events/`**: Contains Discord event handlers (Ready, InteractionCreate).
--   **`types.d.ts`**: Module augmentation to provide type-safety for `client.commands`.
+-   **`database.ts`**: SQLite database initialization and schema management using `better-sqlite3`.
+-   **`gameState.ts`**: Persistent state management for streaks and active challenges.
+-   **`utils/roleUtils.ts`**: Helper for role-based King identification.
+-   **`commands/`**: Contains slash command logic (Challenge, Accept, Report, King, SetKing).
+-   **`events/`**: Discord event handlers (Ready, InteractionCreate).
+-   **`types.d.ts`**: Type-safety for client commands.
 
 ---
 
-## 📝 Roadmap (What's Left to Do)
+## ✅ Completed Features
 
-This project is currently a functional MVP. Here is what is recommended for the next developer:
-
-1.  **Persistence**: Currently, the game state is in-memory. If the bot restarts, the King and streaks are lost. 
-    -   *Task*: Integrate a database (SQLite, MongoDB, or PostgreSQL) or a simple JSON file store.
-2.  **Original Nickname Recovery**: When a King loses, the bot doesn't know what their original nickname was before the `[Streak]` was added.
-    -   *Task*: Store the user's original nickname in the database before changing it.
-3.  **Leaderboard**: 
-    -   *Task*: Implement a `/leaderboard` command to show all-time high streaks.
-4.  **Match History**:
-    -   *Task*: Log all completed matches to a channel or database.
-5.  **Auto-Setup**:
-    -   *Task*: Add a `/setup` command that automatically creates the required role and channel if they don't exist.
-6.  **Permissions**:
-    -   *Task*: Refine who can report matches (currently both participants can, which might lead to conflicts).
+-   [x] **SQLite Persistence**: Game state (streaks, challenges) is stored locally in `koth.db`.
+-   [x] **Role-Based King**: The current King is identified directly by their Discord role.
+-   [x] **Restricted Reporting**: Reports are only accepted in a dedicated channel and can be restricted to specific roles.
+-   [x] **Win Streaks**: Tracks and displays win streaks in nicknames and announcements.
+-   [x] **Match Management**: BO3/BO5 challenge system with acceptance flow.
+-   [x] **TypeScript**: Fully typed codebase for reliability.
