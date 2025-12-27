@@ -2,7 +2,7 @@ import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
 import * as challengeCommand from './commands/challenge';
 import * as acceptCommand from './commands/accept';
-import * as reportCommand from './commands/report';
+import * as reportCommand from './commands/reportResult/reportResult';
 import * as kingCommand from './commands/king';
 import * as setkingCommand from './commands/setking';
 
