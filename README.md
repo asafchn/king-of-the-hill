@@ -62,6 +62,9 @@ Open the `config.json` file in this folder and update the values to match exactl
 ```
 
 ### 4. Run the Bot
+
+*Prequisite* 
+Make sure you have node.js installed on your system (node16)
 1.  Install dependencies:
     ```bash
     npm install
