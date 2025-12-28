@@ -1,6 +1,6 @@
 import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
-import * as challengeCommand from './commands/challenge';
+
 import * as kingCommand from './commands/king';
 import * as setkingCommand from './commands/setking';
 import * as dashboardCommand from './commands/dashboard';
@@ -10,7 +10,6 @@ import * as resetchallengeCommand from './commands/resetchallenge';
 dotenv.config();
 
 const commands = [
-    challengeCommand.data.toJSON(),
     kingCommand.data.toJSON(),
     setkingCommand.data.toJSON(),
     dashboardCommand.data.toJSON(),
