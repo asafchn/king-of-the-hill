@@ -5,10 +5,11 @@ import * as reportCommand from "./commands/reportResult/reportResult";
 import * as kingCommand from "./commands/king";
 import * as setkingCommand from "./commands/setking";
 
-export const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+export class ExtendedClient extends Client {
+    public commands: Collection<string, any> = new Collection();
+}
 
-// Initialize the commands collection
-client.commands = new Collection();
+export const client = new ExtendedClient({ intents: [GatewayIntentBits.Guilds] });
 
 export function registerCommands() {
     client.commands.set(challengeCommand.data.name, challengeCommand);

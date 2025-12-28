@@ -1,10 +1,11 @@
 import { Events, Interaction, ChatInputCommandInteraction } from 'discord.js';
+import { ExtendedClient } from '../Client';
 
 export const name = Events.InteractionCreate;
 export const execute = async (interaction: Interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    const command = interaction.client.commands.get(interaction.commandName);
+    const command = (interaction.client as ExtendedClient).commands.get(interaction.commandName);
 
     if (!command) {
         console.error(`No command matching ${interaction.commandName} was found.`);
