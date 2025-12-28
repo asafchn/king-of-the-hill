@@ -53,9 +53,9 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
     if (customId === 'challenge_king') {
         const state = getState();
         const kingMember = await getCurrentKing(guild);
-        if (!kingMember) return interaction.reply({ content: 'No King to challenge.', ephemeral: true });
-        if (state.activeChallenge) return interaction.reply({ content: 'Challenge in progress.', ephemeral: true });
-        if (interaction.user.id === kingMember.id) return interaction.reply({ content: 'You are King.', ephemeral: true });
+        if (!kingMember) return interaction.reply({ content: '❌ No King to challenge.', ephemeral: true });
+        if (state.activeChallenge) return interaction.reply({ content: '❌ A challenge is already in progress.', ephemeral: true });
+        if (interaction.user.id === kingMember.id) return interaction.reply({ content: '❌ You are the King!', ephemeral: true });
 
         setChallenge({
             challenger: interaction.user.id,
@@ -65,7 +65,10 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
             accepted: false
         });
 
-        await interaction.reply({ content: 'Challenge sent!', ephemeral: true });
+        // Remove buttons from the message that triggered the challenge
+        await interaction.message.edit({ components: [] }).catch(() => null);
+
+        await interaction.reply({ content: '⚔️ Challenge sent!', ephemeral: true });
 
         const annChannel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
         if (annChannel) await annChannel.send(`⚔️ **NEW CHALLENGE!** ${interaction.user} has challenged the King, ${kingMember}!`);
@@ -82,12 +85,21 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
 
     if (customId === 'accept_challenge') {
         const state = getState();
-        if (!state.activeChallenge || state.activeChallenge.defender !== interaction.user.id || state.activeChallenge.accepted) {
-            return interaction.reply({ content: 'Invalid or already accepted.', ephemeral: true });
+        if (!state.activeChallenge || state.activeChallenge.accepted) {
+            return interaction.reply({ content: '❌ Invalid or already accepted.', ephemeral: true });
+        }
+
+        // Restriction: Only the defender can accept
+        if (interaction.user.id !== state.activeChallenge.defender) {
+            return interaction.reply({ content: '❌ Only the challenged player can accept this!', ephemeral: true });
         }
 
         db.prepare("UPDATE matches SET status = 'active' WHERE status = 'pending'").run();
-        await interaction.reply({ content: 'Accepted!', ephemeral: true });
+
+        // Remove buttons from the message
+        await interaction.message.edit({ components: [] }).catch(() => null);
+
+        await interaction.reply({ content: '✅ Challenge accepted!', ephemeral: true });
 
         const channel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
         if (channel) await channel.send(`✅ **ACCEPTED!** The match between <@${state.activeChallenge.challenger}> and <@${state.activeChallenge.defender}> is ON!`);
@@ -117,6 +129,9 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
         if (updatedState?.challengerVote && updatedState?.defenderVote) {
             const annChannel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
 
+            // Remove buttons from the voting message once both have voted
+            await interaction.message.edit({ components: [] }).catch(() => null);
+
             if (updatedState.challengerVote === updatedState.defenderVote) {
                 // Consensus!
                 const finalWinnerId = updatedState.challengerVote;
@@ -124,9 +139,22 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
                 await handleRoleAndNicknameUpdates(guild, oldKingId, finalWinnerId, isNewKing);
 
                 if (annChannel) {
+                    // This will send a NEW message with a new "Challenge" button via announceResult if we used it, 
+                    // but wait, processMatchEnd only clears local state. 
+                    // Actually, announceResult is called from ChatInputCommandInteraction normally.
+                    // Here we are in a button interaction. Let's make sure things happen.
                     const streak = getState().streak;
-                    if (isNewKing) await annChannel.send(`👑 **NEW KING!** <@${finalWinnerId}> defeated <@${oldKingId}>!\nStreak: **${streak}**`);
-                    else await annChannel.send(`👑 **STILL KING!** <@${finalWinnerId}> defended the throne!\nStreak: **${streak}**`);
+
+                    // Create Challenge King button for the result message
+                    const challengeButton = new ButtonBuilder()
+                        .setCustomId('challenge_king')
+                        .setLabel('Challenge the King')
+                        .setStyle(ButtonStyle.Danger)
+                        .setEmoji('⚔️');
+                    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
+
+                    if (isNewKing) await annChannel.send({ content: `👑 **NEW KING!** <@${finalWinnerId}> defeated <@${oldKingId}>!\nStreak: **${streak}**`, components: [row] });
+                    else await annChannel.send({ content: `👑 **STILL KING!** <@${finalWinnerId}> defended the throne!\nStreak: **${streak}**`, components: [row] });
                 }
             } else {
                 // Conflict!

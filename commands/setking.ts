@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { getCurrentKing } from '../utils/roleUtils';
 import { resetStreak, setKing } from '../gameState';
 import config from '../config.json';
@@ -33,5 +33,16 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
         if (newMember) await newMember.roles.add(role).catch(() => null);
     }
 
-    await interaction.editReply(`👑 All hail the new King, ${targetUser}!`);
+    // Create Challenge King button
+    const challengeButton = new ButtonBuilder()
+        .setCustomId('challenge_king')
+        .setLabel('Challenge the King')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('⚔️');
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
+
+    await interaction.editReply({
+        content: `👑 All hail the new King, ${targetUser}!`,
+        components: [row]
+    });
 };

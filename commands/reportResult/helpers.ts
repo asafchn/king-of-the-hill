@@ -1,4 +1,4 @@
-import { Guild, GuildMember, ChatInputCommandInteraction } from "discord.js";
+import { Guild, GuildMember, ChatInputCommandInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
 import { clearChallenge, GameState, getState, setKing } from "../../gameState";
 import config from '../../config.json';
 import { updateStreakNickname } from "../../utils/roleUtils";
@@ -86,11 +86,22 @@ export async function announceResult(interaction: ChatInputCommandInteraction, w
     const channel = interaction.guild?.channels.cache.find(c => c.name === config.channelName);
     if (!channel || !channel.isTextBased()) return;
 
+    // Create Challenge King button
+    const challengeButton = new ButtonBuilder()
+        .setCustomId('challenge_king')
+        .setLabel('Challenge the King')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('⚔️');
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
+
     const streak = getState().streak;
-    if (isNewKing) {
-        await channel.send(`👑 **NEW KING!** <@${winnerId}> has defeated <@${oldKingId}> and claimed the throne! \nCurrent Streak: **${streak}**`);
-    } else {
-        await channel.send(`👑 **STILL KING!** <@${winnerId}> defended the throne! \nCurrent Streak: **${streak}**`);
-    }
+    const content = isNewKing
+        ? `👑 **NEW KING!** <@${winnerId}> has defeated <@${oldKingId}> and claimed the throne! \nCurrent Streak: **${streak}**`
+        : `👑 **STILL KING!** <@${winnerId}> defended the throne! \nCurrent Streak: **${streak}**`;
+
+    await (channel as any).send({
+        content,
+        components: [row]
+    });
 }
 

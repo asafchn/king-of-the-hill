@@ -117,6 +117,10 @@ export const fullReset = (): void => {
     db.prepare("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')").run();
 };
 
+export const softReset = (): void => {
+    db.prepare("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')").run();
+};
+
 export const clearChallenge = (): void => {
     db.prepare("UPDATE matches SET status = 'completed' WHERE status IN ('pending', 'active')").run();
 };

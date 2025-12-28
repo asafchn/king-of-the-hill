@@ -5,6 +5,7 @@ import * as kingCommand from './commands/king';
 import * as setkingCommand from './commands/setking';
 import * as dashboardCommand from './commands/dashboard';
 import * as resetCommand from './commands/reset';
+import * as resetchallengeCommand from './commands/resetchallenge';
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ const commands = [
     setkingCommand.data.toJSON(),
     dashboardCommand.data.toJSON(),
     resetCommand.data.toJSON(),
+    resetchallengeCommand.data.toJSON(),
 ];
 
 const token = process.env.DISCORD_TOKEN;
