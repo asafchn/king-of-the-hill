@@ -7,6 +7,11 @@ import { handleOpenCrownModal, handleCrownModalSubmit } from './interactions/cro
 
 export async function handleButtonInteraction(interaction: ButtonInteraction) {
     const { customId } = interaction;
+    if (customId.startsWith('vote_winner_')) {
+        await handleVoteWinner(interaction);
+        return;
+    }
+
     switch (customId) {
         case 'show_king':
             await handleShowKing(interaction);
@@ -16,9 +21,6 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
             break;
         case 'accept_challenge':
             await handleAcceptChallenge(interaction);
-            break;
-        case 'vote_winner':
-            await handleVoteWinner(interaction);
             break;
         case 'open_crown_modal':
             await handleOpenCrownModal(interaction);

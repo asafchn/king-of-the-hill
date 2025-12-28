@@ -4,10 +4,13 @@ import config from '../../config.json';
 import { sendReportButtons } from './vote_winner'; // Will implement this next
 
 export async function handleAcceptChallenge(interaction: ButtonInteraction) {
-    const guild = interaction.guild;
-    if (!guild) return;
-
     await interaction.deferReply({ ephemeral: true });
+
+    // Handle DM context: fetch the main guild
+    const guild = interaction.guild || interaction.client.guilds.cache.first();
+    if (!guild) {
+        return interaction.editReply('❌ Could not find the server.');
+    }
 
     try {
         const state = getState();

@@ -46,74 +46,81 @@ export async function handleVoteWinner(interaction: ButtonInteraction) {
     const guild = interaction.guild;
     if (!guild) return;
 
-    const state = getState();
-    const challenge = state.activeChallenge;
+    await interaction.deferReply({ ephemeral: true });
 
-    if (!challenge || !challenge.accepted) {
-        return interaction.reply({ content: 'No active match to report.', ephemeral: true });
-    }
+    try {
+        const state = getState();
+        const challenge = state.activeChallenge;
 
-    if (interaction.user.id !== challenge.challenger && interaction.user.id !== challenge.defender) {
-        return interaction.reply({ content: 'You are not in this match!', ephemeral: true });
-    }
-
-    castVote(interaction.user.id, winnerId);
-    await interaction.reply({ content: `You voted for <@${winnerId}> as the winner. Waiting for opponent...`, ephemeral: true });
-
-    const updatedState = getState().activeChallenge;
-    if (updatedState?.challengerVote && updatedState?.defenderVote) {
-        const annChannel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
-
-        await interaction.message.edit({ components: [] }).catch(() => null);
-
-        if (updatedState.challengerVote === updatedState.defenderVote) {
-            const finalWinnerId = updatedState.challengerVote;
-            const { isNewKing, oldKingId } = processMatchEnd(getState(), finalWinnerId);
-            await handleRoleAndNicknameUpdates(guild, oldKingId, finalWinnerId, isNewKing);
-
-            if (annChannel) {
-                const streak = getState().streak;
-                const challengeButton = new ButtonBuilder()
-                    .setCustomId('challenge_king')
-                    .setLabel('Challenge the King')
-                    .setStyle(ButtonStyle.Danger)
-                    .setEmoji('⚔️');
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
-
-                const embed = new EmbedBuilder()
-                    .setColor(isNewKing ? 0xFFA500 : 0x00FF00)
-                    .setTitle(isNewKing ? "👑 NEW KING!" : "👑 STILL KING!")
-                    .setDescription(isNewKing
-                        ? `<@${finalWinnerId}> has defeated <@${oldKingId}> and claimed the throne!`
-                        : `<@${finalWinnerId}> defended the throne!`)
-                    .addFields({ name: "Current Streak", value: `**${streak}**`, inline: true })
-                    .setTimestamp();
-
-                // Add winner avatar
-                const winnerMember = await guild.members.fetch(finalWinnerId).catch(() => null);
-                if (winnerMember) embed.setThumbnail(winnerMember.user.displayAvatarURL());
-
-                if ((config as any).announcementImagePath) {
-                    embed.setImage((config as any).announcementImagePath);
-                }
-
-                await annChannel.send({ embeds: [embed], components: [row] });
-            }
-        } else {
-            clearVotes();
-            if (annChannel) {
-                const embed = new EmbedBuilder()
-                    .setColor(0xFF0000)
-                    .setTitle("⚠️ VOTE CONFLICT!")
-                    .setDescription(`<@${challenge.challenger}> and <@${challenge.defender}> disagreed on the winner. **Please vote again.**`)
-                    .setTimestamp();
-
-                if ((config as any).announcementImagePath) {
-                    embed.setImage((config as any).announcementImagePath);
-                }
-                await annChannel.send({ embeds: [embed] });
-            }
-            await sendReportButtons(guild, challenge.challenger, challenge.defender);
+        if (!challenge || !challenge.accepted) {
+            return interaction.editReply('No active match to report.');
         }
+
+        if (interaction.user.id !== challenge.challenger && interaction.user.id !== challenge.defender) {
+            return interaction.editReply('You are not in this match!');
+        }
+
+        castVote(interaction.user.id, winnerId);
+        await interaction.editReply(`You voted for <@${winnerId}> as the winner. Waiting for opponent...`);
+
+        const updatedState = getState().activeChallenge;
+        if (updatedState?.challengerVote && updatedState?.defenderVote) {
+            const annChannel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
+
+            await interaction.message.edit({ components: [] }).catch(() => null);
+
+            if (updatedState.challengerVote === updatedState.defenderVote) {
+                const finalWinnerId = updatedState.challengerVote;
+                const { isNewKing, oldKingId } = processMatchEnd(getState(), finalWinnerId);
+                await handleRoleAndNicknameUpdates(guild, oldKingId, finalWinnerId, isNewKing);
+
+                if (annChannel) {
+                    const streak = getState().streak;
+                    const challengeButton = new ButtonBuilder()
+                        .setCustomId('challenge_king')
+                        .setLabel('Challenge the King')
+                        .setStyle(ButtonStyle.Danger)
+                        .setEmoji('⚔️');
+                    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
+
+                    const embed = new EmbedBuilder()
+                        .setColor(isNewKing ? 0xFFA500 : 0x00FF00)
+                        .setTitle(isNewKing ? "👑 NEW KING!" : "👑 STILL KING!")
+                        .setDescription(isNewKing
+                            ? `<@${finalWinnerId}> has defeated <@${oldKingId}> and claimed the throne!`
+                            : `<@${finalWinnerId}> defended the throne!`)
+                        .addFields({ name: "Current Streak", value: `**${streak}**`, inline: true })
+                        .setTimestamp();
+
+                    // Add winner avatar
+                    const winnerMember = await guild.members.fetch(finalWinnerId).catch(() => null);
+                    if (winnerMember) embed.setThumbnail(winnerMember.user.displayAvatarURL());
+
+                    if ((config as any).announcementImagePath) {
+                        embed.setImage((config as any).announcementImagePath);
+                    }
+
+                    await annChannel.send({ embeds: [embed], components: [row] });
+                }
+            } else {
+                clearVotes();
+                if (annChannel) {
+                    const embed = new EmbedBuilder()
+                        .setColor(0xFF0000)
+                        .setTitle("⚠️ VOTE CONFLICT!")
+                        .setDescription(`<@${challenge.challenger}> and <@${challenge.defender}> disagreed on the winner. **Please vote again.**`)
+                        .setTimestamp();
+
+                    if ((config as any).announcementImagePath) {
+                        embed.setImage((config as any).announcementImagePath);
+                    }
+                    await annChannel.send({ embeds: [embed] });
+                }
+                await sendReportButtons(guild, challenge.challenger, challenge.defender);
+            }
+        }
+    } catch (error) {
+        console.error("Error handling vote winner:", error);
+        await interaction.editReply('❌ An error occurred while voting for the winner.');
     }
 }
