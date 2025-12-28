@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import config from './config.json';
 
-const dbPath = path.resolve(__dirname, 'koth.db');
+const dbPath = path.resolve(__dirname, `${config.db_name}.db`);
 const db = new Database(dbPath);
 
 // Initialize schema
@@ -46,16 +47,8 @@ if (!columnNames.includes('defender_vote')) {
 const stateColumns = db.prepare("PRAGMA table_info(game_state)").all() as any[];
 const stateColumnNames = stateColumns.map(c => c.name);
 if (!stateColumnNames.includes('last_challenge_accepted_at')) {
-    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at INTEGER;");
-    db.prepare("UPDATE game_state SET last_challenge_accepted_at = ?").run(new Date().getTime());
+    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;");
     console.log("[DB] Added missing column: last_challenge_accepted_at");
-}
-
-// Migration (Validation): Ensure it holds a number (timestamp)
-const row = db.prepare('SELECT last_challenge_accepted_at FROM game_state WHERE id = 1').get() as any;
-if (row && typeof row.last_challenge_accepted_at !== 'number') {
-    db.prepare("UPDATE game_state SET last_challenge_accepted_at = ? WHERE id = 1").run(new Date().getTime());
-    console.log("[DB] Migrated last_challenge_accepted_at to numeric timestamp");
 }
 
 export default db;
