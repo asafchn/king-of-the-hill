@@ -29,4 +29,17 @@ db.exec(`
     INSERT OR IGNORE INTO game_state (id, current_king_id, streak) VALUES (1, NULL, 0);
 `);
 
+// Migration: Add columns if they don't exist (handle existing databases)
+const columns = db.prepare("PRAGMA table_info(matches)").all() as any[];
+const columnNames = columns.map(c => c.name);
+
+if (!columnNames.includes('challenger_vote')) {
+    db.exec("ALTER TABLE matches ADD COLUMN challenger_vote TEXT;");
+    console.log("[DB] Added missing column: challenger_vote");
+}
+if (!columnNames.includes('defender_vote')) {
+    db.exec("ALTER TABLE matches ADD COLUMN defender_vote TEXT;");
+    console.log("[DB] Added missing column: defender_vote");
+}
+
 export default db;
