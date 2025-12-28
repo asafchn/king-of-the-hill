@@ -1,6 +1,7 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { getCurrentKing } from '../utils/roleUtils';
 import { getState } from '../gameState';
+import config from '../config.json';
 
 export const data = new SlashCommandBuilder()
     .setName('king')
@@ -14,9 +15,28 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     const state = getState();
 
     if (!currentKingMember) {
-        return interaction.editReply('There is no King currently reigning!');
+        const noKingEmbed = new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle("👑 No King")
+            .setDescription("There is no King currently reigning!");
+        return interaction.editReply({ embeds: [noKingEmbed] });
     }
 
     const streak = state.streak;
-    await interaction.editReply(`👑 The current King is ${currentKingMember} with a win streak of **${streak}**!`);
+    const kingEmbed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle("👑 CURRENT KING")
+        .setDescription(`The current King is <@${currentKingMember.id}>!`)
+        .addFields({ name: "Win Streak", value: `**${streak}**`, inline: true })
+        .setTimestamp();
+
+    // Add king avatar (user per profile image)
+    kingEmbed.setThumbnail(currentKingMember.user.displayAvatarURL());
+
+    // Add server image from config
+    if ((config as any).announcementImagePath) {
+        kingEmbed.setImage((config as any).announcementImagePath);
+    }
+
+    await interaction.editReply({ embeds: [kingEmbed] });
 };

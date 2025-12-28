@@ -1,4 +1,4 @@
-import { Guild, GuildMember, ChatInputCommandInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
+import { Guild, GuildMember, ChatInputCommandInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
 import { clearChallenge, GameState, getState, setKing } from "../../gameState";
 import config from '../../config.json';
 import { updateStreakNickname } from "../../utils/roleUtils";
@@ -64,8 +64,15 @@ export async function handleRoleAndNicknameUpdates(guild: Guild, oldKingId: stri
     if (oldKingId && isNewKing) {
         try {
             const oldMember = await guild.members.fetch(oldKingId);
-            if (oldMember) await oldMember.roles.remove(role);
-        } catch (e) { console.error('Failed to remove role', e); }
+            if (oldMember) {
+                await oldMember.roles.remove(role);
+                // Strip existing [n] streak suffix if it exists
+                const baseName = oldMember.displayName.replace(/\s\[\d+\]$/, '');
+                if (oldMember.nickname !== baseName) {
+                    await oldMember.setNickname(baseName).catch(() => null);
+                }
+            }
+        } catch (e) { console.error('Failed to remove role/clean nickname', e); }
     }
 
     // Add role and update nickname for new king
@@ -95,13 +102,26 @@ export async function announceResult(interaction: ChatInputCommandInteraction, w
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
 
     const streak = getState().streak;
-    const content = isNewKing
-        ? `👑 **NEW KING!** <@${winnerId}> has defeated <@${oldKingId}> and claimed the throne! \nCurrent Streak: **${streak}**`
-        : `👑 **STILL KING!** <@${winnerId}> defended the throne! \nCurrent Streak: **${streak}**`;
+
+    const embed = new EmbedBuilder()
+        .setColor(isNewKing ? 0xFFA500 : 0x00FF00) // Orange for New King, Green for Defense
+        .setTitle(isNewKing ? "👑 NEW KING!" : "👑 STILL KING!")
+        .setDescription(isNewKing
+            ? `<@${winnerId}> has defeated <@${oldKingId}> and claimed the throne!`
+            : `<@${winnerId}> defended the throne!`)
+        .addFields({ name: "Current Streak", value: `**${streak}**`, inline: true })
+        .setTimestamp();
+
+    // Add user avatar (the reporter's avatar)
+    embed.setThumbnail(interaction.user.displayAvatarURL());
+
+    // Add server image from config
+    if ((config as any).announcementImagePath) {
+        embed.setImage((config as any).announcementImagePath);
+    }
 
     await (channel as any).send({
-        content,
+        embeds: [embed],
         components: [row]
     });
 }
-

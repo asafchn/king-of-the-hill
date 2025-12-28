@@ -1,6 +1,6 @@
-import { ButtonInteraction, ModalSubmitInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ModalActionRowComponentBuilder, ButtonBuilder, ButtonStyle, TextChannel } from 'discord.js';
+import { ButtonInteraction, ModalSubmitInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ModalActionRowComponentBuilder, ButtonBuilder, ButtonStyle, TextChannel, EmbedBuilder } from 'discord.js';
 import { getCurrentKing } from '../utils/roleUtils';
-import { getState, resetStreak, setKing, setChallenge, castVote, clearVotes, clearChallenge as clearGameChallenge } from '../gameState';
+import { getState, resetStreak, setKing, setChallenge, castVote, clearVotes, clearChallenge as clearGameChallenge, acceptChallenge } from '../gameState';
 import { processMatchEnd, handleRoleAndNicknameUpdates } from '../commands/reportResult/helpers';
 import config from '../config.json';
 import db from '../database';
@@ -12,7 +12,6 @@ async function sendReportButtons(guild: any, challengerId: string, defenderId: s
     const challenger = await guild.members.fetch(challengerId).catch(() => null);
     const defender = await guild.members.fetch(defenderId).catch(() => null);
 
-    const msgContent = `⚔️ **MATCH OVER?** Select the winner below to confirm the result. Both players must agree!`;
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
             .setCustomId(`vote_winner_${challengerId}`)
@@ -24,11 +23,20 @@ async function sendReportButtons(guild: any, challengerId: string, defenderId: s
             .setStyle(ButtonStyle.Secondary)
     );
 
-    // Send to announcement channel tagging both
+    const embed = new EmbedBuilder()
+        .setColor(0xFFFF00)
+        .setTitle("⚔️ MATCH OVER?")
+        .setDescription(`${challenger} and ${defender}, select the winner below to confirm the result. **Both players must agree!**`)
+        .setTimestamp();
+
+    if ((config as any).announcementImagePath) {
+        embed.setImage((config as any).announcementImagePath);
+    }
+
     const channel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
     if (channel) {
         await channel.send({
-            content: `${challenger} and ${defender}, ${msgContent}`,
+            embeds: [embed],
             components: [row]
         });
     }
@@ -65,13 +73,23 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
             accepted: false
         });
 
-        // Remove buttons from the message that triggered the challenge
         await interaction.message.edit({ components: [] }).catch(() => null);
 
         await interaction.reply({ content: '⚔️ Challenge sent!', ephemeral: true });
 
         const annChannel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
-        if (annChannel) await annChannel.send(`⚔️ **NEW CHALLENGE!** ${interaction.user} has challenged the King, ${kingMember}!`);
+        if (annChannel) {
+            const embed = new EmbedBuilder()
+                .setColor(0x0099FF)
+                .setTitle("⚔️ NEW CHALLENGE!")
+                .setDescription(`<@${interaction.user.id}> has challenged the King, <@${kingMember.id}>!`)
+                .setTimestamp();
+
+            if ((config as any).announcementImagePath) {
+                embed.setImage((config as any).announcementImagePath);
+            }
+            await annChannel.send({ embeds: [embed] });
+        }
 
         try {
             const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -89,22 +107,30 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
             return interaction.reply({ content: '❌ Invalid or already accepted.', ephemeral: true });
         }
 
-        // Restriction: Only the defender can accept
         if (interaction.user.id !== state.activeChallenge.defender) {
             return interaction.reply({ content: '❌ Only the challenged player can accept this!', ephemeral: true });
         }
 
-        db.prepare("UPDATE matches SET status = 'active' WHERE status = 'pending'").run();
+        acceptChallenge();
 
-        // Remove buttons from the message
         await interaction.message.edit({ components: [] }).catch(() => null);
 
         await interaction.reply({ content: '✅ Challenge accepted!', ephemeral: true });
 
         const channel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
-        if (channel) await channel.send(`✅ **ACCEPTED!** The match between <@${state.activeChallenge.challenger}> and <@${state.activeChallenge.defender}> is ON!`);
+        if (channel) {
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle("✅ CHALLENGE ACCEPTED!")
+                .setDescription(`The match between <@${state.activeChallenge.challenger}> and <@${state.activeChallenge.defender}> is **ON**!`)
+                .setTimestamp();
 
-        // Send public report buttons
+            if ((config as any).announcementImagePath) {
+                embed.setImage((config as any).announcementImagePath);
+            }
+            await channel.send({ embeds: [embed] });
+        }
+
         await sendReportButtons(guild, state.activeChallenge.challenger, state.activeChallenge.defender);
     }
 
@@ -124,28 +150,19 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
         castVote(interaction.user.id, winnerId);
         await interaction.reply({ content: `You voted for <@${winnerId}> as the winner. Waiting for opponent...`, ephemeral: true });
 
-        // Check if both have voted
         const updatedState = getState().activeChallenge;
         if (updatedState?.challengerVote && updatedState?.defenderVote) {
             const annChannel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
 
-            // Remove buttons from the voting message once both have voted
             await interaction.message.edit({ components: [] }).catch(() => null);
 
             if (updatedState.challengerVote === updatedState.defenderVote) {
-                // Consensus!
                 const finalWinnerId = updatedState.challengerVote;
                 const { isNewKing, oldKingId } = processMatchEnd(getState(), finalWinnerId);
                 await handleRoleAndNicknameUpdates(guild, oldKingId, finalWinnerId, isNewKing);
 
                 if (annChannel) {
-                    // This will send a NEW message with a new "Challenge" button via announceResult if we used it, 
-                    // but wait, processMatchEnd only clears local state. 
-                    // Actually, announceResult is called from ChatInputCommandInteraction normally.
-                    // Here we are in a button interaction. Let's make sure things happen.
                     const streak = getState().streak;
-
-                    // Create Challenge King button for the result message
                     const challengeButton = new ButtonBuilder()
                         .setCustomId('challenge_king')
                         .setLabel('Challenge the King')
@@ -153,13 +170,35 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
                         .setEmoji('⚔️');
                     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
 
-                    if (isNewKing) await annChannel.send({ content: `👑 **NEW KING!** <@${finalWinnerId}> defeated <@${oldKingId}>!\nStreak: **${streak}**`, components: [row] });
-                    else await annChannel.send({ content: `👑 **STILL KING!** <@${finalWinnerId}> defended the throne!\nStreak: **${streak}**`, components: [row] });
+                    const embed = new EmbedBuilder()
+                        .setColor(isNewKing ? 0xFFA500 : 0x00FF00)
+                        .setTitle(isNewKing ? "👑 NEW KING!" : "👑 STILL KING!")
+                        .setDescription(isNewKing
+                            ? `<@${finalWinnerId}> has defeated <@${oldKingId}> and claimed the throne!`
+                            : `<@${finalWinnerId}> defended the throne!`)
+                        .addFields({ name: "Current Streak", value: `**${streak}**`, inline: true })
+                        .setTimestamp();
+
+                    if ((config as any).announcementImagePath) {
+                        embed.setImage((config as any).announcementImagePath);
+                    }
+
+                    await annChannel.send({ embeds: [embed], components: [row] });
                 }
             } else {
-                // Conflict!
                 clearVotes();
-                if (annChannel) await annChannel.send(`⚠️ **VOTE CONFLICT!** <@${challenge.challenger}> and <@${challenge.defender}> disagreed on the winner. **Please vote again.**`);
+                if (annChannel) {
+                    const embed = new EmbedBuilder()
+                        .setColor(0xFF0000)
+                        .setTitle("⚠️ VOTE CONFLICT!")
+                        .setDescription(`<@${challenge.challenger}> and <@${challenge.defender}> disagreed on the winner. **Please vote again.**`)
+                        .setTimestamp();
+
+                    if ((config as any).announcementImagePath) {
+                        embed.setImage((config as any).announcementImagePath);
+                    }
+                    await annChannel.send({ embeds: [embed] });
+                }
                 await sendReportButtons(guild, challenge.challenger, challenge.defender);
             }
         }
@@ -191,7 +230,14 @@ export async function handleModalInteraction(interaction: ModalSubmitInteraction
             if (role) {
                 if (oldKingId) {
                     const oldMember = await guild.members.fetch(oldKingId).catch(() => null);
-                    if (oldMember) await oldMember.roles.remove(role).catch(() => null);
+                    if (oldMember) {
+                        await oldMember.roles.remove(role).catch(() => null);
+                        // Strip existing [n] streak suffix if it exists
+                        const baseName = oldMember.displayName.replace(/\s\[\d+\]$/, '');
+                        if (oldMember.nickname !== baseName) {
+                            await oldMember.setNickname(baseName).catch(() => null);
+                        }
+                    }
                 }
                 const newMember = await guild.members.fetch(targetUser.id).catch(() => null);
                 if (newMember) await newMember.roles.add(role).catch(() => null);

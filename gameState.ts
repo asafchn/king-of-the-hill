@@ -1,4 +1,5 @@
 import db from './database';
+import config from './config.json';
 
 export interface Challenge {
     challenger: string;
@@ -18,28 +19,31 @@ export interface GameState {
 }
 
 /**
- * Checks if the current King has failed to respond to a challenge within 3 days.
- * If so, resets the King and streak.
+ * Checks if the current King has failed to accept a challenge within the configured time.
+ * Logic: If a pending challenge exists AND the time since the last accepted challenge 
+ * (or since being crowned) exceeds the timeout, revoke the title.
  */
-const checkChallengeExpiration = (rawState: { king: string | null, streak: number }, rawChallenge: any) => {
+export const checkChallengeExpiration = (rawState: { king: string | null, streak: number, last_challenge_accepted_at: string }, rawChallenge: any): string | null => {
     if (rawState.king && rawChallenge && rawChallenge.status === 'pending') {
-        const createdAt = new Date(rawChallenge.created_at).getTime();
+        const lastAcceptedAt = new Date(rawState.last_challenge_accepted_at).getTime();
         const now = Date.now();
-        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        const timeoutHours = config.inactivityTimeoutHours || 24;
+        const timeoutMs = timeoutHours * 60 * 60 * 1000;
 
-        if (now - createdAt > threeDays) {
-            console.log(`[AUD] Challenge expired. King ${rawState.king} failed to respond in 3 days.`);
+        if (now - lastAcceptedAt > timeoutMs) {
+            const revokedId = rawState.king;
+            console.log(`[AUD] Inactivity detected. King ${revokedId} hasn't accepted a challenge in ${timeoutHours} hours.`);
             db.prepare("UPDATE game_state SET current_king_id = NULL, streak = 0 WHERE id = 1").run();
             db.prepare("UPDATE matches SET status = 'cancelled' WHERE id = ?").run(rawChallenge.id);
-            return true; // State was reset
+            return revokedId;
         }
     }
-    return false;
+    return null;
 };
 
 // Helper to get raw state from DB
 const getRawState = () => {
-    return db.prepare('SELECT current_king_id as king, streak FROM game_state WHERE id = 1').get() as { king: string | null, streak: number };
+    return db.prepare('SELECT current_king_id as king, streak, last_challenge_accepted_at FROM game_state WHERE id = 1').get() as { king: string | null, streak: number, last_challenge_accepted_at: string };
 };
 
 // Helper to get active challenge from DB
@@ -47,14 +51,18 @@ const getRawChallenge = () => {
     return db.prepare("SELECT * FROM matches WHERE status IN ('pending', 'active') LIMIT 1").get() as any;
 };
 
+/**
+ * Explicitly triggers the inactivity check and returns the revoked King's ID if any.
+ */
+export const checkAndRevoke = (): string | null => {
+    const rawState = getRawState();
+    const rawChallengeRow = getRawChallenge();
+    return checkChallengeExpiration(rawState, rawChallengeRow);
+};
+
 export const getState = (): GameState => {
     let rawState = getRawState();
     const rawChallengeRow = getRawChallenge();
-
-    // Run expiration check
-    if (checkChallengeExpiration(rawState, rawChallengeRow)) {
-        rawState = getRawState(); // Refresh state if reset
-    }
 
     let activeChallenge: Challenge | null = null;
     if (rawChallengeRow && rawChallengeRow.status !== 'cancelled') {
@@ -82,7 +90,7 @@ export const setKing = (userId: string): void => {
     if (state.king === userId) {
         db.prepare('UPDATE game_state SET streak = streak + 1 WHERE id = 1').run();
     } else {
-        db.prepare('UPDATE game_state SET current_king_id = ?, streak = 1 WHERE id = 1').run(userId);
+        db.prepare('UPDATE game_state SET current_king_id = ?, streak = 1, last_challenge_accepted_at = CURRENT_TIMESTAMP WHERE id = 1').run(userId);
     }
 };
 
@@ -132,4 +140,5 @@ export const updateScores = (challengerScore: number, defenderScore: number): vo
 
 export const acceptChallenge = (): void => {
     db.prepare("UPDATE matches SET status = 'active' WHERE status = 'pending'").run();
+    db.prepare("UPDATE game_state SET last_challenge_accepted_at = CURRENT_TIMESTAMP WHERE id = 1").run();
 }

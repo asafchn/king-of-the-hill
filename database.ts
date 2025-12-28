@@ -9,7 +9,8 @@ db.exec(`
     CREATE TABLE IF NOT EXISTS game_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         current_king_id TEXT,
-        streak INTEGER DEFAULT 0
+        streak INTEGER DEFAULT 0,
+        last_challenge_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS matches (
@@ -40,6 +41,13 @@ if (!columnNames.includes('challenger_vote')) {
 if (!columnNames.includes('defender_vote')) {
     db.exec("ALTER TABLE matches ADD COLUMN defender_vote TEXT;");
     console.log("[DB] Added missing column: defender_vote");
+}
+
+const stateColumns = db.prepare("PRAGMA table_info(game_state)").all() as any[];
+const stateColumnNames = stateColumns.map(c => c.name);
+if (!stateColumnNames.includes('last_challenge_accepted_at')) {
+    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;");
+    console.log("[DB] Added missing column: last_challenge_accepted_at");
 }
 
 export default db;

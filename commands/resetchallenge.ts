@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, TextChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, TextChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from 'discord.js';
 import { softReset, getState } from '../gameState';
 import { getCurrentKing } from '../utils/roleUtils';
 import config from '../config.json';
@@ -9,8 +9,6 @@ export const data = new SlashCommandBuilder()
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export const execute = async (interaction: ChatInputCommandInteraction) => {
-    await interaction.deferReply({ ephemeral: true });
-
     const member = interaction.member;
     const guild = interaction.guild;
     if (!guild || !member) return;
@@ -28,7 +26,21 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     // Re-announce the King with a new challenge button if there is one
     const annChannel = guild.channels.cache.find(c => c.name === config.channelName) as TextChannel;
     if (annChannel) {
-        await annChannel.send('🔄 **CHALLENGE RESET!** The current challenge has been cleared, but the King remains on the throne!');
+        const resetEmbed = new EmbedBuilder()
+            .setColor(0xFFFF00)
+            .setTitle("🔄 CHALLENGE RESET!")
+            .setDescription("The current challenge has been cleared, but the King remains on the throne!")
+            .setTimestamp();
+
+        // Add user avatar
+        resetEmbed.setThumbnail(interaction.user.displayAvatarURL());
+
+        // Add server image from config
+        if ((config as any).announcementImagePath) {
+            resetEmbed.setImage((config as any).announcementImagePath);
+        }
+
+        await annChannel.send({ embeds: [resetEmbed] });
 
         const state = getState();
         if (state.king) {
@@ -41,8 +53,21 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
                     .setEmoji('⚔️');
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
 
+                const kingEmbed = new EmbedBuilder()
+                    .setColor(0x00FF00)
+                    .setTitle("👑 STILL KING!")
+                    .setDescription(`<@${kingMember.id}> is waiting for the next challenger!`)
+                    .addFields({ name: "Current Streak", value: `**${state.streak}**`, inline: true })
+                    .setTimestamp();
+
+                // Also add images to the King re-announcement
+                kingEmbed.setThumbnail(kingMember.user.displayAvatarURL());
+                if ((config as any).announcementImagePath) {
+                    kingEmbed.setImage((config as any).announcementImagePath);
+                }
+
                 await annChannel.send({
-                    content: `👑 **STILL KING!** ${kingMember} is waiting for the next challenger! \nCurrent Streak: **${state.streak}**`,
+                    embeds: [kingEmbed],
                     components: [row]
                 });
             }

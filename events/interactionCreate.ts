@@ -28,7 +28,7 @@ export const execute = async (interaction: Interaction) => {
             const channelName = channel && 'name' in channel ? (channel as any).name : null;
 
             const announcementsOnly = ['challenge', 'accept'];
-            const reportsOnly = ['report', 'king', 'setking', 'dashboard'];
+            const reportsOnly = ['report', 'king', 'setking', 'dashboard', 'reset', 'resetchallenge'];
 
             if (announcementsOnly.includes(commandName) && channelName !== config.channelName) {
                 const announcementChannel = interaction.guild?.channels.cache.find(c => c.name === config.channelName);

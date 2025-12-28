@@ -1,5 +1,5 @@
-import { Guild, GuildMember, TextChannel } from "discord.js";
-import { getState } from '../gameState';
+import { EmbedBuilder, Guild, GuildMember, TextChannel } from "discord.js";
+import { getState, checkAndRevoke } from '../gameState';
 import config from '../config.json';
 
 export async function getCurrentKing(guild: Guild): Promise<GuildMember | null> {
@@ -80,5 +80,48 @@ export async function updateStreakNickname(member: GuildMember, channel?: any) {
         if (channel && channel.isTextBased()) {
             await channel.send(`⚠️ (Note: Could not update <@${member.id}>'s nickname due to permissions)`);
         }
+    }
+}
+
+/**
+ * Checks for inactivity and handles Discord side effects if a revocation occurs.
+ */
+export async function checkAndHandleRevocation(guild: Guild) {
+    const revokedId = checkAndRevoke();
+    if (!revokedId) return;
+
+    console.log(`[AUD] King revocation detected for ${revokedId}. Handling side effects...`);
+
+    const role = guild.roles.cache.find(r => r.name === config.roleName);
+    const channel = guild.channels.cache.find(c => c.name === config.channelName) as TextChannel;
+
+    try {
+        const member = await guild.members.fetch(revokedId).catch(() => null);
+        if (member) {
+            if (role) await member.roles.remove(role).catch(() => null);
+
+            // Strip streak from nickname
+            const baseName = member.displayName.replace(/\s\[\d+\]$/, '');
+            if (member.nickname !== baseName) {
+                await member.setNickname(baseName).catch(() => null);
+            }
+        }
+
+        if (channel && channel.isTextBased()) {
+            const timeoutHours = config.inactivityTimeoutHours || 72;
+            const embed = new EmbedBuilder()
+                .setColor(0xFF0000)
+                .setTitle("⚖️ THE CROWN HAS BEEN REVOKED!")
+                .setDescription(`<@${revokedId}> failed to respond to a challenge within ${timeoutHours} hours. The throne is now vacant!`)
+                .setTimestamp();
+
+            if ((config as any).announcementImagePath) {
+                embed.setImage((config as any).announcementImagePath);
+            }
+
+            await channel.send({ embeds: [embed] });
+        }
+    } catch (e) {
+        console.error('[ERR] Failed to handle King revocation side effects:', e);
     }
 }

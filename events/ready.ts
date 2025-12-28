@@ -1,5 +1,5 @@
 import { Events, Client } from 'discord.js';
-import { syncKingState } from '../utils/roleUtils';
+import { syncKingState, checkAndHandleRevocation } from '../utils/roleUtils';
 
 export const name = Events.ClientReady;
 export const execute = async (client: Client) => {
@@ -9,5 +9,11 @@ export const execute = async (client: Client) => {
     const guild = client.guilds.cache.first();
     if (guild) {
         await syncKingState(guild);
+
+        // Periodic inactivity check (hourly)
+        console.log('[BOT] Starting background inactivity checker...');
+        setInterval(async () => {
+            await checkAndHandleRevocation(guild);
+        }, 60 * 60 * 1000);
     }
 };

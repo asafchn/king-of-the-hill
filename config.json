@@ -2,5 +2,7 @@
     "roleName": "koth",
     "modRoleName": "KOTH-Mod",
     "channelName": "koth-announcements",
-    "reportChannelName": "koth-reports"
+    "reportChannelName": "koth-reports",
+    "announcementImagePath": "",
+    "inactivityTimeoutHours": 24
 }
