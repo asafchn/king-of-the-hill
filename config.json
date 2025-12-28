@@ -1,5 +1,6 @@
 {
-    "roleName": "King of the Hill",
+    "roleName": "koth",
+    "modRoleName": "KOTH-Mod",
     "channelName": "koth-announcements",
     "reportChannelName": "koth-reports"
 }

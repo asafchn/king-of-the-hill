@@ -112,6 +112,11 @@ export const clearVotes = (): void => {
     db.prepare("UPDATE matches SET challenger_vote = NULL, defender_vote = NULL WHERE status = 'active'").run();
 };
 
+export const fullReset = (): void => {
+    db.prepare('UPDATE game_state SET current_king_id = NULL, streak = 0 WHERE id = 1').run();
+    db.prepare("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')").run();
+};
+
 export const clearChallenge = (): void => {
     db.prepare("UPDATE matches SET status = 'completed' WHERE status IN ('pending', 'active')").run();
 };
