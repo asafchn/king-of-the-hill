@@ -1,4 +1,5 @@
 import { Client, GatewayIntentBits, Collection } from "discord.js";
+import * as challengeCommand from "./commands/challenge";
 import * as kingCommand from "./commands/king";
 import * as setkingCommand from "./commands/setking";
 import * as dashboardCommand from "./commands/dashboard";
@@ -17,6 +18,7 @@ export const client = new ExtendedClient({
 });
 
 export function registerCommands() {
+    client.commands.set(challengeCommand.data.name, challengeCommand);
     client.commands.set(kingCommand.data.name, kingCommand);
     client.commands.set(setkingCommand.data.name, setkingCommand);
     client.commands.set(dashboardCommand.data.name, dashboardCommand);
