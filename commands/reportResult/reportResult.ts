@@ -16,15 +16,6 @@ export const data = new SlashCommandBuilder()
             .setRequired(true));
 
 export const execute = async (interaction: ChatInputCommandInteraction) => {
-    // 1. Channel Restriction
-    const channel = interaction.channel as TextChannel;
-    if (channel?.name !== config.reportChannelName) {
-        return interaction.reply({
-            content: `This command can only be used in the #${config.reportChannelName} channel.`,
-            ephemeral: true
-        });
-    }
-
     const state = getState();
 
     // 2. Validation
