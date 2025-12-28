@@ -16,28 +16,35 @@ export async function handleAcceptChallenge(interaction: ButtonInteraction) {
         return interaction.reply({ content: '❌ Only the challenged player can accept this!', ephemeral: true });
     }
 
-    acceptChallenge();
+    try {
+        acceptChallenge();
 
-    await interaction.message.edit({ components: [] }).catch(() => null);
+        await interaction.message.edit({ components: [] }).catch(() => null);
 
-    await interaction.reply({ content: '✅ Challenge accepted!', ephemeral: true });
+        await interaction.reply({ content: '✅ Challenge accepted!', ephemeral: true });
 
-    const channel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
-    if (channel) {
-        const embed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle("✅ CHALLENGE ACCEPTED!")
-            .setDescription(`The match between <@${state.activeChallenge.challenger}> and <@${state.activeChallenge.defender}> is **ON**!`)
-            .setTimestamp();
+        const channel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
+        if (channel) {
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle("✅ CHALLENGE ACCEPTED!")
+                .setDescription(`The match between <@${state.activeChallenge.challenger}> and <@${state.activeChallenge.defender}> is **ON**!`)
+                .setTimestamp();
 
-        // Add user avatar
-        embed.setThumbnail(interaction.user.displayAvatarURL());
+            // Add user avatar
+            embed.setThumbnail(interaction.user.displayAvatarURL());
 
-        if ((config as any).announcementImagePath) {
-            embed.setImage((config as any).announcementImagePath);
+            if ((config as any).announcementImagePath) {
+                embed.setImage((config as any).announcementImagePath);
+            }
+            await channel.send({ embeds: [embed] });
         }
-        await channel.send({ embeds: [embed] });
-    }
 
-    await sendReportButtons(guild, state.activeChallenge.challenger, state.activeChallenge.defender);
+        await sendReportButtons(guild, state.activeChallenge.challenger, state.activeChallenge.defender);
+    } catch (error) {
+        console.error("Error handling accept challenge:", error);
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '❌ An error occurred while accepting the challenge.', ephemeral: true });
+        }
+    }
 }

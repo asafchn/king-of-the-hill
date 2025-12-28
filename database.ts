@@ -46,7 +46,8 @@ if (!columnNames.includes('defender_vote')) {
 const stateColumns = db.prepare("PRAGMA table_info(game_state)").all() as any[];
 const stateColumnNames = stateColumns.map(c => c.name);
 if (!stateColumnNames.includes('last_challenge_accepted_at')) {
-    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;");
+    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at TIMESTAMP;");
+    db.exec("UPDATE game_state SET last_challenge_accepted_at = CURRENT_TIMESTAMP;");
     console.log("[DB] Added missing column: last_challenge_accepted_at");
 }
 
