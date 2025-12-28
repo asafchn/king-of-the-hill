@@ -20,8 +20,8 @@ export async function handleCrownModalSubmit(interaction: ModalSubmitInteraction
         const currentKingMember = await getCurrentKing(guild);
         const oldKingId = currentKingMember?.id;
 
-        resetStreak();
-        setKing(targetUser.id);
+        await resetStreak();
+        await setKing(targetUser.id);
 
         const role = guild.roles.cache.find(r => r.name === config.roleName);
         if (role) {

@@ -36,12 +36,12 @@ export function getMatchResults(challenge: any, challengerScore: number, defende
 /**
  * Updates game state and returns transition details
  */
-export function processMatchEnd(state: GameState, winnerId: string) {
+export async function processMatchEnd(state: GameState, winnerId: string) {
     const oldKingId = state.king;
     const isNewKing = oldKingId !== winnerId;
 
-    setKing(winnerId);
-    clearChallenge();
+    await setKing(winnerId);
+    await clearChallenge();
 
     return { winnerId, oldKingId, isNewKing };
 }
@@ -101,7 +101,8 @@ export async function announceResult(interaction: ChatInputCommandInteraction, w
         .setEmoji('⚔️');
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
 
-    const streak = getState().streak;
+    const state = await getState();
+    const streak = state.streak;
 
     const embed = new EmbedBuilder()
         .setColor(isNewKing ? 0xFFA500 : 0x00FF00) // Orange for New King, Green for Defense

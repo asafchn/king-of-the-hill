@@ -1,54 +1,79 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
 import config from './config.json';
 
-const dbPath = path.resolve(__dirname, `${config.db_name}.db`);
-const db = new Database(dbPath);
+dotenv.config();
 
-// Initialize schema
-db.exec(`
-    CREATE TABLE IF NOT EXISTS game_state (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        current_king_id TEXT,
-        streak INTEGER DEFAULT 0,
-        last_challenge_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS matches (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        challenger_id TEXT NOT NULL,
-        defender_id TEXT NOT NULL,
-        type TEXT NOT NULL,
-        challenger_score INTEGER DEFAULT 0,
-        defender_score INTEGER DEFAULT 0,
-        status TEXT DEFAULT 'pending', -- pending, active, completed, cancelled
-        challenger_vote TEXT,
-        defender_vote TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Ensure initial row in game_state
-    INSERT OR IGNORE INTO game_state (id, current_king_id, streak) VALUES (1, NULL, 0);
-`);
-
-// Migration: Add columns if they don't exist (handle existing databases)
-const columns = db.prepare("PRAGMA table_info(matches)").all() as any[];
-const columnNames = columns.map(c => c.name);
-
-if (!columnNames.includes('challenger_vote')) {
-    db.exec("ALTER TABLE matches ADD COLUMN challenger_vote TEXT;");
-    console.log("[DB] Added missing column: challenger_vote");
-}
-if (!columnNames.includes('defender_vote')) {
-    db.exec("ALTER TABLE matches ADD COLUMN defender_vote TEXT;");
-    console.log("[DB] Added missing column: defender_vote");
+if (!process.env.DATABASE_URL) {
+    console.error("[DB] Error: DATABASE_URL is not defined in .env");
+    process.exit(1);
 }
 
-const stateColumns = db.prepare("PRAGMA table_info(game_state)").all() as any[];
-const stateColumnNames = stateColumns.map(c => c.name);
-if (!stateColumnNames.includes('last_challenge_accepted_at')) {
-    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;");
-    console.log("[DB] Added missing column: last_challenge_accepted_at");
-}
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
 
-export default db;
+const initDb = async () => {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS game_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                current_king_id TEXT,
+                streak INTEGER DEFAULT 0,
+                last_challenge_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS matches (
+                id SERIAL PRIMARY KEY,
+                challenger_id TEXT NOT NULL,
+                defender_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                challenger_score INTEGER DEFAULT 0,
+                defender_score INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending', -- pending, active, completed, cancelled
+                challenger_vote TEXT,
+                defender_vote TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // Ensure initial row in game_state
+        await pool.query(`
+            INSERT INTO game_state (id, current_king_id, streak)
+            VALUES (1, NULL, 0)
+            ON CONFLICT (id) DO NOTHING;
+        `);
+
+        console.log("[DB] Database initialized (tables verified).");
+
+        // Migrations: Add columns if they don't exist
+        const addColumnIfNotExists = async (table: string, column: string, type: string) => {
+            try {
+                await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${type};`);
+                console.log(`[DB] Added missing column: ${column} to ${table}`);
+            } catch (err: any) {
+                // Ignore error if column already exists (code 42701 in postgres)
+                if (err.code !== '42701') {
+                    console.error(`[DB] Migration error for ${column}:`, err.message);
+                }
+            }
+        };
+
+        await addColumnIfNotExists('matches', 'challenger_vote', 'TEXT');
+        await addColumnIfNotExists('matches', 'defender_vote', 'TEXT');
+        await addColumnIfNotExists('game_state', 'last_challenge_accepted_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+
+    } catch (err: any) {
+        console.error("[DB] Initialization error:", err);
+    }
+};
+
+// Initialize on start
+initDb();
+
+export default pool;

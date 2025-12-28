@@ -13,7 +13,7 @@ export async function handleAcceptChallenge(interaction: ButtonInteraction) {
     }
 
     try {
-        const state = getState();
+        const state = await getState();
         if (!state.activeChallenge || state.activeChallenge.accepted) {
             return interaction.editReply('❌ Invalid or already accepted.');
         }
@@ -22,7 +22,7 @@ export async function handleAcceptChallenge(interaction: ButtonInteraction) {
             return interaction.editReply('❌ Only the challenged player can accept this!');
         }
 
-        acceptChallenge();
+        await acceptChallenge();
 
         await interaction.message.edit({ components: [] }).catch(() => null);
 

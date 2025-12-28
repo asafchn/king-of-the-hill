@@ -23,15 +23,9 @@ export interface GameState {
  * Logic: If a pending challenge exists AND the time since the last accepted challenge 
  * (or since being crowned) exceeds the timeout, revoke the title.
  */
-export const checkChallengeExpiration = (rawState: { king: string | null, streak: number, last_challenge_accepted_at: string | number }, rawChallenge: any): string | null => {
+export const checkChallengeExpiration = async (rawState: { king: string | null, streak: number, last_challenge_accepted_at: string | number | Date }, rawChallenge: any): Promise<string | null> => {
     if (rawState.king && rawChallenge && rawChallenge.status === 'pending') {
-        // Handle both string (legacy) and number timestamps
-        let lastAcceptedAt = 0;
-        if (typeof rawState.last_challenge_accepted_at === 'number') {
-            lastAcceptedAt = rawState.last_challenge_accepted_at;
-        } else {
-            lastAcceptedAt = new Date(rawState.last_challenge_accepted_at).getTime();
-        }
+        const lastAcceptedAt = new Date(rawState.last_challenge_accepted_at).getTime();
 
         const now = Date.now();
         const timeoutHours = config.inactivityTimeoutHours || 24;
@@ -40,8 +34,8 @@ export const checkChallengeExpiration = (rawState: { king: string | null, streak
         if (now - lastAcceptedAt > timeoutMs) {
             const revokedId = rawState.king;
             console.log(`[AUD] Inactivity detected. King ${revokedId} hasn't accepted a challenge in ${timeoutHours} hours.`);
-            db.prepare("UPDATE game_state SET current_king_id = NULL, streak = 0 WHERE id = 1").run();
-            db.prepare("UPDATE matches SET status = 'cancelled' WHERE id = ?").run(rawChallenge.id);
+            await db.query("UPDATE game_state SET current_king_id = NULL, streak = 0 WHERE id = 1");
+            await db.query("UPDATE matches SET status = 'cancelled' WHERE id = $1", [rawChallenge.id]);
             return revokedId;
         }
     }
@@ -49,27 +43,29 @@ export const checkChallengeExpiration = (rawState: { king: string | null, streak
 };
 
 // Helper to get raw state from DB
-const getRawState = () => {
-    return db.prepare('SELECT current_king_id as king, streak, last_challenge_accepted_at FROM game_state WHERE id = 1').get() as { king: string | null, streak: number, last_challenge_accepted_at: string | number };
+const getRawState = async () => {
+    const res = await db.query('SELECT current_king_id as king, streak, last_challenge_accepted_at FROM game_state WHERE id = 1');
+    return res.rows[0] as { king: string | null, streak: number, last_challenge_accepted_at: string | number | Date };
 };
 
 // Helper to get active challenge from DB
-const getRawChallenge = () => {
-    return db.prepare("SELECT * FROM matches WHERE status IN ('pending', 'active') LIMIT 1").get() as any;
+const getRawChallenge = async () => {
+    const res = await db.query("SELECT * FROM matches WHERE status IN ('pending', 'active') LIMIT 1");
+    return res.rows[0] as any;
 };
 
 /**
  * Explicitly triggers the inactivity check and returns the revoked King's ID if any.
  */
-export const checkAndRevoke = (): string | null => {
-    const rawState = getRawState();
-    const rawChallengeRow = getRawChallenge();
+export const checkAndRevoke = async (): Promise<string | null> => {
+    const rawState = await getRawState();
+    const rawChallengeRow = await getRawChallenge();
     return checkChallengeExpiration(rawState, rawChallengeRow);
 };
 
-export const getState = (): GameState => {
-    let rawState = getRawState();
-    const rawChallengeRow = getRawChallenge();
+export const getState = async (): Promise<GameState> => {
+    let rawState = await getRawState();
+    const rawChallengeRow = await getRawChallenge();
 
     let activeChallenge: Challenge | null = null;
     if (rawChallengeRow && rawChallengeRow.status !== 'cancelled') {
@@ -86,68 +82,71 @@ export const getState = (): GameState => {
     }
 
     return {
-        king: rawState.king,
-        streak: rawState.streak,
+        king: rawState?.king || null,
+        streak: rawState?.streak || 0,
         activeChallenge: activeChallenge
     };
 };
 
-export const setKing = (userId: string): void => {
-    const state = getRawState();
+export const setKing = async (userId: string): Promise<void> => {
+    const state = await getRawState();
     if (state.king === userId) {
         // King defended throne: increment streak AND reset activity timer
-        db.prepare('UPDATE game_state SET streak = streak + 1, last_challenge_accepted_at = ? WHERE id = 1').run(new Date().getTime());
+        // Postgres to_timestamp is not needed if we pass a Date or ISO string, but passing simple Date() works with pg
+        await db.query('UPDATE game_state SET streak = streak + 1, last_challenge_accepted_at = CURRENT_TIMESTAMP WHERE id = 1');
     } else {
         // New King: reset streak and timer
-        db.prepare('UPDATE game_state SET current_king_id = ?, streak = 1, last_challenge_accepted_at = ? WHERE id = 1').run(userId, new Date().getTime());
+        await db.query('UPDATE game_state SET current_king_id = $1, streak = 1, last_challenge_accepted_at = CURRENT_TIMESTAMP WHERE id = 1', [userId]);
     }
 };
 
-export const resetStreak = (): void => {
-    db.prepare('UPDATE game_state SET streak = 0 WHERE id = 1').run();
+export const resetStreak = async (): Promise<void> => {
+    await db.query('UPDATE game_state SET streak = 0 WHERE id = 1');
 };
 
-export const setChallenge = (challenge: Challenge): void => {
+export const setChallenge = async (challenge: Challenge): Promise<void> => {
     // Clear any previous pending/active challenges first
-    db.prepare("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')").run();
-    db.prepare('INSERT INTO matches (challenger_id, defender_id, type, challenger_score, defender_score, status) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(challenge.challenger, challenge.defender, challenge.type, challenge.scores.challenger, challenge.scores.defender, challenge.accepted ? 'active' : 'pending');
+    await db.query("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')");
+    await db.query(
+        'INSERT INTO matches (challenger_id, defender_id, type, challenger_score, defender_score, status) VALUES ($1, $2, $3, $4, $5, $6)',
+        [challenge.challenger, challenge.defender, challenge.type, challenge.scores.challenger, challenge.scores.defender, challenge.accepted ? 'active' : 'pending']
+    );
 };
 
-export const castVote = (userId: string, winnerId: string): void => {
-    const challenge = getState().activeChallenge;
+export const castVote = async (userId: string, winnerId: string): Promise<void> => {
+    const state = await getState();
+    const challenge = state.activeChallenge;
     if (!challenge) return;
 
     if (userId === challenge.challenger) {
-        db.prepare("UPDATE matches SET challenger_vote = ? WHERE status = 'active'").run(winnerId);
+        await db.query("UPDATE matches SET challenger_vote = $1 WHERE status = 'active'", [winnerId]);
     } else if (userId === challenge.defender) {
-        db.prepare("UPDATE matches SET defender_vote = ? WHERE status = 'active'").run(winnerId);
+        await db.query("UPDATE matches SET defender_vote = $1 WHERE status = 'active'", [winnerId]);
     }
 };
 
-export const clearVotes = (): void => {
-    db.prepare("UPDATE matches SET challenger_vote = NULL, defender_vote = NULL WHERE status = 'active'").run();
+export const clearVotes = async (): Promise<void> => {
+    await db.query("UPDATE matches SET challenger_vote = NULL, defender_vote = NULL WHERE status = 'active'");
 };
 
-export const fullReset = (): void => {
-    db.prepare('UPDATE game_state SET current_king_id = NULL, streak = 0 WHERE id = 1').run();
-    db.prepare("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')").run();
+export const fullReset = async (): Promise<void> => {
+    await db.query('UPDATE game_state SET current_king_id = NULL, streak = 0 WHERE id = 1');
+    await db.query("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')");
 };
 
-export const softReset = (): void => {
-    db.prepare("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')").run();
+export const softReset = async (): Promise<void> => {
+    await db.query("UPDATE matches SET status = 'cancelled' WHERE status IN ('pending', 'active')");
 };
 
-export const clearChallenge = (): void => {
-    db.prepare("UPDATE matches SET status = 'completed' WHERE status IN ('pending', 'active')").run();
+export const clearChallenge = async (): Promise<void> => {
+    await db.query("UPDATE matches SET status = 'completed' WHERE status IN ('pending', 'active')");
 };
 
-export const updateScores = (challengerScore: number, defenderScore: number): void => {
-    db.prepare("UPDATE matches SET challenger_score = ?, defender_score = ? WHERE status IN ('pending', 'active')")
-        .run(challengerScore, defenderScore);
+export const updateScores = async (challengerScore: number, defenderScore: number): Promise<void> => {
+    await db.query("UPDATE matches SET challenger_score = $1, defender_score = $2 WHERE status IN ('pending', 'active')", [challengerScore, defenderScore]);
 };
 
-export const acceptChallenge = (): void => {
-    db.prepare("UPDATE matches SET status = 'active' WHERE status = 'pending'").run();
-    db.prepare("UPDATE game_state SET last_challenge_accepted_at = ? WHERE id = 1").run(new Date().getTime());
+export const acceptChallenge = async (): Promise<void> => {
+    await db.query("UPDATE matches SET status = 'active' WHERE status = 'pending'");
+    await db.query("UPDATE game_state SET last_challenge_accepted_at = CURRENT_TIMESTAMP WHERE id = 1");
 }

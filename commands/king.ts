@@ -12,7 +12,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     if (!guild) return;
 
     const currentKingMember = await getCurrentKing(guild);
-    const state = getState();
+    const state = await getState();
 
     if (!currentKingMember) {
         const noKingEmbed = new EmbedBuilder()

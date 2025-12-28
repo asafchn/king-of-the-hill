@@ -21,7 +21,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
         return interaction.editReply({ content: '❌ You do not have permission to use this command.' });
     }
 
-    softReset();
+    await softReset();
 
     // Re-announce the King with a new challenge button if there is one
     const annChannel = guild.channels.cache.find(c => c.name === config.channelName) as TextChannel;
@@ -42,7 +42,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
 
         await annChannel.send({ embeds: [resetEmbed] });
 
-        const state = getState();
+        const state = await getState();
         if (state.king) {
             const kingMember = await getCurrentKing(guild);
             if (kingMember) {

@@ -49,7 +49,7 @@ export async function handleVoteWinner(interaction: ButtonInteraction) {
     await interaction.deferReply({ ephemeral: true });
 
     try {
-        const state = getState();
+        const state = await getState();
         const challenge = state.activeChallenge;
 
         if (!challenge || !challenge.accepted) {
@@ -60,10 +60,11 @@ export async function handleVoteWinner(interaction: ButtonInteraction) {
             return interaction.editReply('You are not in this match!');
         }
 
-        castVote(interaction.user.id, winnerId);
+        await castVote(interaction.user.id, winnerId);
         await interaction.editReply(`You voted for <@${winnerId}> as the winner. Waiting for opponent...`);
 
-        const updatedState = getState().activeChallenge;
+        const updatedStateFull = await getState();
+        const updatedState = updatedStateFull.activeChallenge;
         if (updatedState?.challengerVote && updatedState?.defenderVote) {
             const annChannel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
 
@@ -71,18 +72,18 @@ export async function handleVoteWinner(interaction: ButtonInteraction) {
 
             if (updatedState.challengerVote === updatedState.defenderVote) {
                 const finalWinnerId = updatedState.challengerVote;
-                const { isNewKing, oldKingId } = processMatchEnd(getState(), finalWinnerId);
+                const { isNewKing, oldKingId } = await processMatchEnd(await getState(), finalWinnerId);
                 await handleRoleAndNicknameUpdates(guild, oldKingId, finalWinnerId, isNewKing);
 
                 if (annChannel) {
-                    const streak = getState().streak;
+                    const streak = (await getState()).streak;
                     const challengeButton = new ButtonBuilder()
                         .setCustomId('challenge_king')
                         .setLabel('Challenge the King')
                         .setStyle(ButtonStyle.Danger)
                         .setEmoji('⚔️');
                     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
-
+                    // ... existing code ...
                     const embed = new EmbedBuilder()
                         .setColor(isNewKing ? 0xFFA500 : 0x00FF00)
                         .setTitle(isNewKing ? "👑 NEW KING!" : "👑 STILL KING!")
@@ -103,7 +104,7 @@ export async function handleVoteWinner(interaction: ButtonInteraction) {
                     await annChannel.send({ embeds: [embed], components: [row] });
                 }
             } else {
-                clearVotes();
+                await clearVotes();
                 if (annChannel) {
                     const embed = new EmbedBuilder()
                         .setColor(0xFF0000)

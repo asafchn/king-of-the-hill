@@ -20,8 +20,8 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     const currentKingMember = await getCurrentKing(guild);
     const oldKingId = currentKingMember?.id;
 
-    resetStreak();
-    setKing(targetUser.id);
+    await resetStreak();
+    await setKing(targetUser.id);
 
     const role = guild.roles.cache.find(r => r.name === config.roleName);
     if (role) {
@@ -50,7 +50,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
             .setEmoji('⚔️');
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(challengeButton);
 
-        const state = getState();
+        const state = await getState();
         const embed = new EmbedBuilder()
             .setColor(0xFFD700)
             .setTitle("👑 NEW KING CROWNED!")

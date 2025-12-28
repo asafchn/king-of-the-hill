@@ -18,7 +18,7 @@ export async function getCurrentKing(guild: Guild): Promise<GuildMember | null> 
  * Synchronizes the Discord roles and nicknames with the database state.
  */
 export async function syncKingState(guild: Guild) {
-    const state = getState();
+    const state = await getState();
     const role = guild.roles.cache.find(r => r.name === config.roleName);
     const channel = guild.channels.cache.find(c => c.name === config.channelName) as TextChannel;
 
@@ -65,7 +65,8 @@ export async function syncKingState(guild: Guild) {
  * Preserves server-specific aliases and avoids streak stacking.
  */
 export async function updateStreakNickname(member: GuildMember, channel?: any) {
-    const streak = getState().streak;
+    const state = await getState();
+    const streak = state.streak;
     // Remove existing [n] streak suffix if it exists
     const baseName = member.displayName.replace(/\s\[\d+\]$/, '');
     const newNick = `${baseName} [${streak}]`;
@@ -87,7 +88,7 @@ export async function updateStreakNickname(member: GuildMember, channel?: any) {
  * Checks for inactivity and handles Discord side effects if a revocation occurs.
  */
 export async function checkAndHandleRevocation(guild: Guild) {
-    const revokedId = checkAndRevoke();
+    const revokedId = await checkAndRevoke();
     if (!revokedId) return;
 
     console.log(`[AUD] King revocation detected for ${revokedId}. Handling side effects...`);

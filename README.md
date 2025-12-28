@@ -61,7 +61,25 @@ Open the `config.json` file in this folder and update the values to match exactl
 }
 ```
 
-### 4. Run the Bot
+### 4. Create `.env` file
+Create a file named `.env` in the root directory and add your keys:
+
+```ini
+# Your Bot Token from the Discord Developer Portal
+DISCORD_TOKEN=your_token_here
+
+# Your Application ID (Client ID)
+CLIENT_ID=123456789012345678
+
+# The ID of your Discord Server
+GUILD_ID=123456789012345678
+
+# PostgreSQL Connection URL
+# Example: postgresql://user:password@localhost:5432/dbname
+DATABASE_URL=postgresql://user:password@host:port/database?sslmode=require
+```
+
+### 5. Run the Bot
 1.  Install dependencies:
     ```bash
     npm install

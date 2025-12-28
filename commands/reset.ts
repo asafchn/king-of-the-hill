@@ -27,7 +27,8 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     console.log(`[AUD] /reset initiated by ${interaction.user.tag}`);
 
     // 1. Reset DB
-    fullReset();
+    // 1. Reset DB
+    await fullReset();
 
     // 2. Remove King role from everyone
     const role = guild.roles.cache.find(r => r.name === config.roleName);

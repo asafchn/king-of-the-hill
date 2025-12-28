@@ -12,7 +12,8 @@ export async function handleShowKing(interaction: ButtonInteraction) {
     }
 
     const king = await getCurrentKing(interaction.guild);
-    const streak = getState().streak;
+    const state = await getState();
+    const streak = state.streak;
 
     if (!king) {
         const noKingEmbed = new EmbedBuilder()

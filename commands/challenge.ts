@@ -11,7 +11,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     const guild = interaction.guild;
     if (!guild) return;
 
-    const state = getState();
+    const state = await getState();
     const kingMember = await getCurrentKing(guild);
 
     if (!kingMember) {
@@ -24,7 +24,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
         return interaction.editReply({ content: '❌ You are the King!' });
     }
 
-    setChallenge({
+    await setChallenge({
         challenger: interaction.user.id,
         defender: kingMember.id,
         type: 'bo3',

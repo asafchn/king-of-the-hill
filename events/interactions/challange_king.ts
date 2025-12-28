@@ -7,7 +7,7 @@ export async function handleChallengeKing(interaction: ButtonInteraction) {
     const guild = interaction.guild;
     if (!guild) return;
 
-    const state = getState();
+    const state = await getState();
     const kingMember = await getCurrentKing(guild);
 
     if (!kingMember) {
@@ -20,7 +20,7 @@ export async function handleChallengeKing(interaction: ButtonInteraction) {
         return interaction.reply({ content: '❌ You are the King!', ephemeral: true });
     }
 
-    setChallenge({
+    await setChallenge({
         challenger: interaction.user.id,
         defender: kingMember.id,
         type: 'bo3',
