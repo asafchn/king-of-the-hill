@@ -31,8 +31,9 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
         const membersWithRole = await guild.members.fetch().then(m => m.filter(mem => mem.roles.cache.has(role.id)));
         for (const [id, member] of membersWithRole) {
             await member.roles.remove(role).catch(() => null);
-            // Optionally reset nickname if we want to be thorough
-            await member.setNickname(member.user.username).catch(() => null);
+            // Remove existing [n] streak suffix if it exists
+            const baseName = member.displayName.replace(/\s\[\d+\]$/, '');
+            await member.setNickname(baseName).catch(() => null);
         }
     }
 

@@ -1,6 +1,7 @@
 import { Guild, GuildMember, ChatInputCommandInteraction } from "discord.js";
 import { clearChallenge, GameState, getState, setKing } from "../../gameState";
 import config from '../../config.json';
+import { updateStreakNickname } from "../../utils/roleUtils";
 
 /**
  * Validates if a report can be made
@@ -77,20 +78,6 @@ export async function handleRoleAndNicknameUpdates(guild: Guild, oldKingId: stri
     } catch (e) { console.error('Failed to update new king', e); }
 }
 
-/**
- * Updates the user's nickname with their current win streak
- */
-export async function updateStreakNickname(member: GuildMember, channel?: any) {
-    const streak = getState().streak;
-    try {
-        await member.setNickname(`${member.user.username} [${streak}]`);
-    } catch (err) {
-        console.log('Nickname update failed (permissions)');
-        if (channel && channel.isTextBased() && 'send' in channel) {
-            await channel.send(`(Note: Could not update King's nickname due to permissions)`);
-        }
-    }
-}
 
 /**
  * Sends the final announcement to the dedicated channel

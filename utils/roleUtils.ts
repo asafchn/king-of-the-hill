@@ -61,20 +61,24 @@ export async function syncKingState(guild: Guild) {
 }
 
 /**
- * Updates the user's nickname with their current win streak
+ * Updates the user's nickname with their current win streak.
+ * Preserves server-specific aliases and avoids streak stacking.
  */
 export async function updateStreakNickname(member: GuildMember, channel?: any) {
     const streak = getState().streak;
+    // Remove existing [n] streak suffix if it exists
+    const baseName = member.displayName.replace(/\s\[\d+\]$/, '');
+    const newNick = `${baseName} [${streak}]`;
+
+    if (member.nickname === newNick) return;
+
     try {
-        const baseName = member.user.username;
-        const newNick = `${baseName} [${streak}]`;
-        if (member.nickname !== newNick) {
-            await member.setNickname(newNick);
-            console.log(`[AUD] Updated nickname for ${baseName} to include streak [${streak}]`);
-        }
+        await member.setNickname(newNick);
+        console.log(`[AUD] Updated nickname for ${member.user.tag} to: ${newNick}`);
     } catch (err) {
+        console.error(`[ERR] Nickname update failed for ${member.user.tag}`, err);
         if (channel && channel.isTextBased()) {
-            await channel.send(`(Note: Could not update ${member.user.username}'s nickname due to permissions)`);
+            await channel.send(`⚠️ (Note: Could not update <@${member.id}>'s nickname due to permissions)`);
         }
     }
 }
