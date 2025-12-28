@@ -19,30 +19,39 @@ export const data = new SlashCommandBuilder()
             ));
 
 export const execute = async (interaction: ChatInputCommandInteraction) => {
+    console.log('[Challenge] Starting execution...');
     const state = getState();
     const challenger = interaction.user;
     let targetUser = interaction.options.getUser('target');
     const type = (interaction.options.getString('type') || 'bo3') as 'bo3' | 'bo5';
 
+    console.log(`[Challenge] Challenger: ${challenger.tag}, Target (optional): ${targetUser?.tag}, Type: ${type}`);
+
     if (!targetUser) {
         if (!state.king) {
-            return interaction.reply({ content: 'There is no King currently! An admin needs to set one first or you can challenge someone specific.', ephemeral: true });
+            console.log('[Challenge] No King set and no target provided.');
+            return interaction.editReply({ content: 'There is no King currently! An admin needs to set one first or you can challenge someone specific.' });
         }
         try {
+            console.log(`[Challenge] No target provided, fetching King from database: ${state.king}`);
             targetUser = await interaction.client.users.fetch(state.king);
         } catch (error) {
-            return interaction.reply({ content: 'Could not find the current King.', ephemeral: true });
+            console.error('[Challenge] Error fetching King:', error);
+            return interaction.editReply({ content: 'Could not find the current King.' });
         }
     }
 
     if (state.activeChallenge) {
-        return interaction.reply({ content: 'There is already an active challenge in progress!', ephemeral: true });
+        console.log('[Challenge] Already an active challenge.');
+        return interaction.editReply({ content: 'There is already an active challenge in progress!' });
     }
 
     if (challenger.id === targetUser.id) {
-        return interaction.reply({ content: 'You cannot challenge yourself!', ephemeral: true });
+        console.log('[Challenge] Challenger tried to challenge themselves.');
+        return interaction.editReply({ content: 'You cannot challenge yourself!' });
     }
 
+    console.log(`[Challenge] Setting up challenge: ${challenger.tag} vs ${targetUser.tag}`);
     setChallenge({
         challenger: challenger.id,
         defender: targetUser.id,
@@ -53,8 +62,13 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
 
     const channel = interaction.guild?.channels.cache.find(c => c.name === config.channelName);
     if (channel && channel.isTextBased()) {
+        console.log(`[Challenge] Sending announcement to channel: ${config.channelName}`);
         await channel.send(`⚔️ **CHALLENGE!** ${challenger} has challenged ${targetUser} to a **${type === 'bo3' ? 'Best of 3' : 'Best of 5'}**! \n${targetUser}, type \`/accept\` to begin!`);
+    } else {
+        console.warn(`[Challenge] Announcement channel ${config.channelName} not found or not text-based.`);
     }
 
-    await interaction.reply({ content: `Challenge sent to ${targetUser}!`, ephemeral: true });
+    console.log('[Challenge] Replying to user...');
+    await interaction.editReply({ content: `Challenge sent to ${targetUser}!` });
+    console.log('[Challenge] Execution finished.');
 };

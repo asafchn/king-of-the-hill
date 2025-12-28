@@ -9,7 +9,13 @@ export class ExtendedClient extends Client {
     public commands: Collection<string, any> = new Collection();
 }
 
-export const client = new ExtendedClient({ intents: [GatewayIntentBits.Guilds] });
+export const client = new ExtendedClient({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMembers
+    ]
+});
 
 export function registerCommands() {
     client.commands.set(challengeCommand.data.name, challengeCommand);
