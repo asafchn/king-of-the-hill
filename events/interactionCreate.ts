@@ -17,28 +17,30 @@ export const execute = async (interaction: Interaction) => {
             return interaction.reply({ content: 'Command not found.', ephemeral: true });
         }
 
-        // Channel Restriction Logic
-        const channel = interaction.channel;
-        const channelName = channel && 'name' in channel ? channel.name : null;
+        // 1. Defer the reply immediately to give us time (3s -> 15m)
+        console.log(`⏱️ Deferring reply for /${commandName}...`);
+        await interaction.deferReply({ ephemeral: true });
 
-        const announcementsOnly = ['challenge', 'accept', 'king', 'setking'];
-        const reportsOnly = ['report'];
+        // 2. Channel Restriction Logic
+        const channel = interaction.channel;
+        const channelName = channel && 'name' in channel ? (channel as any).name : null;
+
+        const announcementsOnly = ['challenge', 'accept'];
+        const reportsOnly = ['report', 'king', 'setking'];
 
         if (announcementsOnly.includes(commandName) && channelName !== config.channelName) {
-            console.log(`⚠️ Restriction: /${commandName} used in wrong channel (${channelName}). Expected: ${config.channelName}`);
+            console.log(`⚠️ Restriction: /${commandName} used in wrong channel. Expected: ${config.channelName}`);
             const announcementChannel = interaction.guild?.channels.cache.find(c => c.name === config.channelName);
-            return interaction.reply({
-                content: `❌ This command can only be used in the ${announcementChannel ? `<#${announcementChannel.id}>` : `#${config.channelName}`} channel.`,
-                ephemeral: true
+            return interaction.editReply({
+                content: `❌ This command can only be used in the ${announcementChannel ? `<#${announcementChannel.id}>` : `#${config.channelName}`} channel.`
             });
         }
 
         if (reportsOnly.includes(commandName) && channelName !== config.reportChannelName) {
-            console.log(`⚠️ Restriction: /${commandName} used in wrong channel (${channelName}). Expected: ${config.reportChannelName}`);
+            console.log(`⚠️ Restriction: /${commandName} used in wrong channel. Expected: ${config.reportChannelName}`);
             const reportChannel = interaction.guild?.channels.cache.find(c => c.name === config.reportChannelName);
-            return interaction.reply({
-                content: `❌ This command can only be used in the ${reportChannel ? `<#${reportChannel.id}>` : `#${config.reportChannelName}`} channel.`,
-                ephemeral: true
+            return interaction.editReply({
+                content: `❌ This command can only be used in the ${reportChannel ? `<#${reportChannel.id}>` : `#${config.reportChannelName}`} channel.`
             });
         }
 
@@ -49,13 +51,14 @@ export const execute = async (interaction: Interaction) => {
         console.error(`💥 Error handling /${commandName}:`, error);
 
         try {
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+            const errorMsg = 'There was an error while executing this command!';
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({ content: errorMsg });
             } else {
-                await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+                await interaction.reply({ content: errorMsg, ephemeral: true });
             }
         } catch (innerError) {
-            console.error('Failed to send error reply:', innerError);
+            console.error('CRITICAL: Failed to send error reply:', innerError);
         }
     }
 };
