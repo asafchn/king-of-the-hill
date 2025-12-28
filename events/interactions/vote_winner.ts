@@ -13,11 +13,11 @@ export async function sendReportButtons(guild: Guild, challengerId: string, defe
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
             .setCustomId(`vote_winner_${challengerId}`)
-            .setLabel(`Winner: ${challenger?.user.username || 'Challenger'}`)
+            .setLabel(`Winner: ${challenger?.displayName || 'Challenger'}`)
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`vote_winner_${defenderId}`)
-            .setLabel(`Winner: ${defender?.user.username || 'Defender'}`)
+            .setLabel(`Winner: ${defender?.displayName || 'Defender'}`)
             .setStyle(ButtonStyle.Secondary)
     );
 
