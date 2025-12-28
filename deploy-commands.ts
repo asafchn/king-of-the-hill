@@ -1,19 +1,17 @@
 import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
 import * as challengeCommand from './commands/challenge';
-import * as acceptCommand from './commands/accept';
-import * as reportCommand from './commands/reportResult/reportResult';
 import * as kingCommand from './commands/king';
 import * as setkingCommand from './commands/setking';
+import * as dashboardCommand from './commands/dashboard';
 
 dotenv.config();
 
 const commands = [
     challengeCommand.data.toJSON(),
-    acceptCommand.data.toJSON(),
-    reportCommand.data.toJSON(),
     kingCommand.data.toJSON(),
     setkingCommand.data.toJSON(),
+    dashboardCommand.data.toJSON(),
 ];
 
 const token = process.env.DISCORD_TOKEN;

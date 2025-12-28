@@ -20,6 +20,8 @@ db.exec(`
         challenger_score INTEGER DEFAULT 0,
         defender_score INTEGER DEFAULT 0,
         status TEXT DEFAULT 'pending', -- pending, active, completed, cancelled
+        challenger_vote TEXT,
+        defender_vote TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
