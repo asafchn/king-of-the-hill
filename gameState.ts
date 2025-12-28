@@ -23,9 +23,16 @@ export interface GameState {
  * Logic: If a pending challenge exists AND the time since the last accepted challenge 
  * (or since being crowned) exceeds the timeout, revoke the title.
  */
-export const checkChallengeExpiration = (rawState: { king: string | null, streak: number, last_challenge_accepted_at: string }, rawChallenge: any): string | null => {
+export const checkChallengeExpiration = (rawState: { king: string | null, streak: number, last_challenge_accepted_at: string | number }, rawChallenge: any): string | null => {
     if (rawState.king && rawChallenge && rawChallenge.status === 'pending') {
-        const lastAcceptedAt = new Date(rawState.last_challenge_accepted_at).getTime();
+        // Handle both string (legacy) and number timestamps
+        let lastAcceptedAt = 0;
+        if (typeof rawState.last_challenge_accepted_at === 'number') {
+            lastAcceptedAt = rawState.last_challenge_accepted_at;
+        } else {
+            lastAcceptedAt = new Date(rawState.last_challenge_accepted_at).getTime();
+        }
+
         const now = Date.now();
         const timeoutHours = config.inactivityTimeoutHours || 24;
         const timeoutMs = timeoutHours * 60 * 60 * 1000;
@@ -43,7 +50,7 @@ export const checkChallengeExpiration = (rawState: { king: string | null, streak
 
 // Helper to get raw state from DB
 const getRawState = () => {
-    return db.prepare('SELECT current_king_id as king, streak, last_challenge_accepted_at FROM game_state WHERE id = 1').get() as { king: string | null, streak: number, last_challenge_accepted_at: string };
+    return db.prepare('SELECT current_king_id as king, streak, last_challenge_accepted_at FROM game_state WHERE id = 1').get() as { king: string | null, streak: number, last_challenge_accepted_at: string | number };
 };
 
 // Helper to get active challenge from DB
@@ -88,9 +95,11 @@ export const getState = (): GameState => {
 export const setKing = (userId: string): void => {
     const state = getRawState();
     if (state.king === userId) {
-        db.prepare('UPDATE game_state SET streak = streak + 1 WHERE id = 1').run();
+        // King defended throne: increment streak AND reset activity timer
+        db.prepare('UPDATE game_state SET streak = streak + 1, last_challenge_accepted_at = ? WHERE id = 1').run(new Date().getTime());
     } else {
-        db.prepare('UPDATE game_state SET current_king_id = ?, streak = 1, last_challenge_accepted_at = CURRENT_TIMESTAMP WHERE id = 1').run(userId);
+        // New King: reset streak and timer
+        db.prepare('UPDATE game_state SET current_king_id = ?, streak = 1, last_challenge_accepted_at = ? WHERE id = 1').run(userId, new Date().getTime());
     }
 };
 
@@ -140,5 +149,5 @@ export const updateScores = (challengerScore: number, defenderScore: number): vo
 
 export const acceptChallenge = (): void => {
     db.prepare("UPDATE matches SET status = 'active' WHERE status = 'pending'").run();
-    db.prepare("UPDATE game_state SET last_challenge_accepted_at = CURRENT_TIMESTAMP WHERE id = 1").run();
+    db.prepare("UPDATE game_state SET last_challenge_accepted_at = ? WHERE id = 1").run(new Date().getTime());
 }

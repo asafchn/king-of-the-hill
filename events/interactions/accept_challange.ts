@@ -7,21 +7,23 @@ export async function handleAcceptChallenge(interaction: ButtonInteraction) {
     const guild = interaction.guild;
     if (!guild) return;
 
-    const state = getState();
-    if (!state.activeChallenge || state.activeChallenge.accepted) {
-        return interaction.reply({ content: '❌ Invalid or already accepted.', ephemeral: true });
-    }
-
-    if (interaction.user.id !== state.activeChallenge.defender) {
-        return interaction.reply({ content: '❌ Only the challenged player can accept this!', ephemeral: true });
-    }
+    await interaction.deferReply({ ephemeral: true });
 
     try {
+        const state = getState();
+        if (!state.activeChallenge || state.activeChallenge.accepted) {
+            return interaction.editReply('❌ Invalid or already accepted.');
+        }
+
+        if (interaction.user.id !== state.activeChallenge.defender) {
+            return interaction.editReply('❌ Only the challenged player can accept this!');
+        }
+
         acceptChallenge();
 
         await interaction.message.edit({ components: [] }).catch(() => null);
 
-        await interaction.reply({ content: '✅ Challenge accepted!', ephemeral: true });
+        await interaction.editReply('✅ Challenge accepted!');
 
         const channel = guild.channels.cache.find((c: any) => c.name === config.channelName) as TextChannel;
         if (channel) {
@@ -43,8 +45,6 @@ export async function handleAcceptChallenge(interaction: ButtonInteraction) {
         await sendReportButtons(guild, state.activeChallenge.challenger, state.activeChallenge.defender);
     } catch (error) {
         console.error("Error handling accept challenge:", error);
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '❌ An error occurred while accepting the challenge.', ephemeral: true });
-        }
+        await interaction.editReply('❌ An error occurred while accepting the challenge.');
     }
 }

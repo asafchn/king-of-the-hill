@@ -46,9 +46,16 @@ if (!columnNames.includes('defender_vote')) {
 const stateColumns = db.prepare("PRAGMA table_info(game_state)").all() as any[];
 const stateColumnNames = stateColumns.map(c => c.name);
 if (!stateColumnNames.includes('last_challenge_accepted_at')) {
-    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at TIMESTAMP;");
-    db.exec("UPDATE game_state SET last_challenge_accepted_at = CURRENT_TIMESTAMP;");
+    db.exec("ALTER TABLE game_state ADD COLUMN last_challenge_accepted_at INTEGER;");
+    db.prepare("UPDATE game_state SET last_challenge_accepted_at = ?").run(new Date().getTime());
     console.log("[DB] Added missing column: last_challenge_accepted_at");
+} else {
+    // Migration fix: Ensure it holds a number (timestamp) if it was previously a string/null
+    const row = db.prepare('SELECT last_challenge_accepted_at FROM game_state WHERE id = 1').get() as any;
+    if (row && typeof row.last_challenge_accepted_at !== 'number') {
+        db.prepare("UPDATE game_state SET last_challenge_accepted_at = ? WHERE id = 1").run(new Date().getTime());
+        console.log("[DB] Migrated last_challenge_accepted_at to numeric timestamp");
+    }
 }
 
 export default db;
